@@ -6,7 +6,7 @@
  * @copyright   2011 Josh Lockhart
  * @link        http://www.slimframework.com
  * @license     http://www.slimframework.com/license
- * @version     2.4.2
+ * @version     2.3.5
  * @package     Slim
  *
  * MIT LICENSE
@@ -32,257 +32,113 @@
  */
 namespace Slim;
 
+use \Slim\Collection;
+use \Slim\Interfaces\ViewInterface;
+
 /**
  * View
  *
- * The view is responsible for rendering a template. The view
- * should subclass \Slim\View and implement this interface:
+ * This class is responsible for fetching and rendering a template with
+ * a given set of data. Although the `\Slim\View` class is itself
+ * capable of rendering PHP templates, it is highly recommended that you
+ * subclass `\Slim\View` for use with popular PHP templating libraries
+ * such as Twig, Smarty, or Mustache.
  *
- * public render(string $template);
+ * If you do choose to create a subclass of `\Slim\View`, the subclass
+ * MUST override the `render` method with this exact signature:
  *
- * This method should render the specified template and return
- * the resultant string.
+ *     public render(string $template);
+ *
+ * The `render` method MUST return the rendered output for the template
+ * identified by the `$template` argument. The `$template` argument will
+ * contain the template file pathname *relative to* the templates base
+ * directory for the current view instance.
+ *
+ * The `Slim-Views` repository contains pre-made custom views for
+ * Twig and Smarty, two of the most popular PHP templating libraries.
+ *
+ * See: https://github.com/codeguy/Slim-Views
+ *
+ * Also, `\Slim\View` extends `\Slim\Container` so
+ * that you may use the convenient `\Slim\Container` interface just
+ * as you do with other Slim application data sets (e.g. HTTP headers,
+ * HTTP cookies, etc.)
  *
  * @package Slim
  * @author  Josh Lockhart
  * @since   1.0.0
  */
-class View
+class View extends Collection implements ViewInterface
 {
     /**
-     * Data available to the view templates
-     * @var \Slim\Helper\Set
-     */
-    protected $data;
-
-    /**
-     * Path to templates base directory (without trailing slash)
-     * @var string
-     */
-    protected $templatesDirectory;
-
-    /**
      * Constructor
+     * @param  string $templateDirectory Path to template directory
+     * @param  array  $items             Initialize set with these items
+     * @api
      */
-    public function __construct()
+    public function __construct($templateDirectory, array $items = array())
     {
-        $this->data = new \Slim\Helper\Set();
+        $this->templateDirectory = rtrim($templateDirectory, DIRECTORY_SEPARATOR);
+        parent::__construct($items);
     }
-
-    /********************************************************************************
-     * Data methods
-     *******************************************************************************/
-
-    /**
-     * Does view data have value with key?
-     * @param  string  $key
-     * @return boolean
-     */
-    public function has($key)
-    {
-        return $this->data->has($key);
-    }
-
-    /**
-     * Return view data value with key
-     * @param  string $key
-     * @return mixed
-     */
-    public function get($key)
-    {
-        return $this->data->get($key);
-    }
-
-    /**
-     * Set view data value with key
-     * @param string $key
-     * @param mixed $value
-     */
-    public function set($key, $value)
-    {
-        $this->data->set($key, $value);
-    }
-
-    /**
-     * Set view data value as Closure with key
-     * @param string $key
-     * @param mixed $value
-     */
-    public function keep($key, Closure $value)
-    {
-        $this->data->keep($key, $value);
-    }
-
-    /**
-     * Return view data
-     * @return array
-     */
-    public function all()
-    {
-        return $this->data->all();
-    }
-
-    /**
-     * Replace view data
-     * @param  array  $data
-     */
-    public function replace(array $data)
-    {
-        $this->data->replace($data);
-    }
-
-    /**
-     * Clear view data
-     */
-    public function clear()
-    {
-        $this->data->clear();
-    }
-
-    /********************************************************************************
-     * Legacy data methods
-     *******************************************************************************/
-
-    /**
-     * DEPRECATION WARNING! This method will be removed in the next major point release
-     *
-     * Get data from view
-     *
-     * @deprecated
-     */
-    public function getData($key = null)
-    {
-        if (!is_null($key)) {
-            return isset($this->data[$key]) ? $this->data[$key] : null;
-        } else {
-            return $this->data->all();
-        }
-    }
-
-    /**
-     * DEPRECATION WARNING! This method will be removed in the next major point release
-     *
-     * Set data for view
-     *
-     * @deprecated
-     */
-    public function setData()
-    {
-        $args = func_get_args();
-        if (count($args) === 1 && is_array($args[0])) {
-            $this->data->replace($args[0]);
-        } elseif (count($args) === 2) {
-            // Ensure original behavior is maintained. DO NOT invoke stored Closures.
-            if (is_object($args[1]) && method_exists($args[1], '__invoke')) {
-                $this->data->set($args[0], $this->data->protect($args[1]));
-            } else {
-                $this->data->set($args[0], $args[1]);
-            }
-        } else {
-            throw new \InvalidArgumentException('Cannot set View data with provided arguments. Usage: `View::setData( $key, $value );` or `View::setData([ key => value, ... ]);`');
-        }
-    }
-
-    /**
-     * DEPRECATION WARNING! This method will be removed in the next major point release
-     *
-     * Append data to view
-     * @param  array $data
-     *
-     * @deprecated
-     */
-    public function appendData($data)
-    {
-        if (!is_array($data)) {
-            throw new \InvalidArgumentException('Cannot append view data. Expected array argument.');
-        }
-        $this->data->replace($data);
-    }
-
-    /********************************************************************************
-     * Resolve template paths
-     *******************************************************************************/
-
-    /**
-     * Set the base directory that contains view templates
-     * @param   string $directory
-     * @throws  \InvalidArgumentException If directory is not a directory
-     */
-    public function setTemplatesDirectory($directory)
-    {
-        $this->templatesDirectory = rtrim($directory, DIRECTORY_SEPARATOR);
-    }
-
-    /**
-     * Get templates base directory
-     * @return string
-     */
-    public function getTemplatesDirectory()
-    {
-        return $this->templatesDirectory;
-    }
-
-    /**
-     * Get fully qualified path to template file using templates base directory
-     * @param  string $file The template file pathname relative to templates base directory
-     * @return string
-     */
-    public function getTemplatePathname($file)
-    {
-        return $this->templatesDirectory . DIRECTORY_SEPARATOR . ltrim($file, DIRECTORY_SEPARATOR);
-    }
-
-    /********************************************************************************
-     * Rendering
-     *******************************************************************************/
 
     /**
      * Display template
      *
      * This method echoes the rendered template to the current output buffer
      *
-     * @param  string   $template   Pathname of template file relative to templates directory
-     * @param  array    $data       Any additonal data to be passed to the template.
+     * @param  string $template Pathname of template file relative to templates directory
+     * @param  array  $items    Expose these array items to the rendered template
+     * @api
      */
-    public function display($template, $data = null)
+    public function display($template, array $data = array())
     {
         echo $this->fetch($template, $data);
     }
 
     /**
-     * Return the contents of a rendered template file
+     * Fetch template
      *
-     * @param    string $template   The template pathname, relative to the template base directory
-     * @param    array  $data       Any additonal data to be passed to the template.
-     * @return string               The rendered template
+     * This method returns the rendered template. This is useful if you need to capture
+     * a rendered template into a variable for futher processing.
+     *
+     * @var    string $template Pathname of template file relative to templates directory
+     * @param  array  $items    Expose these array items to the rendered template
+     * @return string           The rendered template
+     * @api
      */
-    public function fetch($template, $data = null)
+    public function fetch($template, array $data = array())
     {
         return $this->render($template, $data);
     }
 
     /**
-     * Render a template file
+     * Render template
      *
-     * NOTE: This method should be overridden by custom view subclasses
+     * This method will render the specified template file using the current application view.
+     * Although this method will work perfectly fine, it is recommended that you create your
+     * own custom view class that implements \Slim\ViewInterface instead of using this default
+     * view class. This default implementation is largely intended as an example.
      *
-     * @param  string $template     The template pathname, relative to the template base directory
-     * @param  array  $data         Any additonal data to be passed to the template.
-     * @return string               The rendered template
-     * @throws \RuntimeException    If resolved template pathname is not a valid file
+     * @var    string            $template Pathname of template file relative to templates directory
+     * @return string                      The rendered template
+     * @throws \RuntimeException           If resolved template pathname is not a valid file
      */
-    protected function render($template, $data = null)
+    protected function render($template, array $data = array())
     {
-        $templatePathname = $this->getTemplatePathname($template);
+        // Resolve and verify template file
+        $templatePathname = $this->templateDirectory . DIRECTORY_SEPARATOR . ltrim($template, DIRECTORY_SEPARATOR);
         if (!is_file($templatePathname)) {
-            throw new \RuntimeException("View cannot render `$template` because the template does not exist");
+            throw new \RuntimeException("Cannot render template `$templatePathname` because the template does not exist. Make sure your view's template directory is correct.");
         }
 
-        $data = array_merge($this->data->all(), (array) $data);
-        extract($data);
+        // Render template with view variables into a temporary output buffer
+        $this->replace($data);
+        extract($this->all());
         ob_start();
         require $templatePathname;
 
+        // Return temporary output buffer content, destroy output buffer
         return ob_get_clean();
     }
 }

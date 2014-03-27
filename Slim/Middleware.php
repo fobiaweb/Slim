@@ -6,7 +6,7 @@
  * @copyright   2011 Josh Lockhart
  * @link        http://www.slimframework.com
  * @license     http://www.slimframework.com/license
- * @version     2.4.2
+ * @version     2.3.5
  * @package     Slim
  *
  * MIT LICENSE
@@ -32,22 +32,36 @@
  */
 namespace Slim;
 
+use \Slim\Interfaces\MiddlewareInterface;
+
 /**
  * Middleware
+ *
+ * This abstract class provides the core scaffolding for Slim application
+ * middleware. Middleware is a layer of logic that wraps itself around
+ * the core Slim application. Each middleware applied to a Slim application
+ * will run before and after the Slim application is run.
+ *
+ * With middleware, you can access the core Slim application objects,
+ * such as the environment, request, response, view, router, etc.,
+ * to affect how the Slim application is run and how it utlimately responds to
+ * the HTTP client.
  *
  * @package Slim
  * @author  Josh Lockhart
  * @since   1.6.0
  */
-abstract class Middleware
+abstract class Middleware implements MiddlewareInterface
 {
     /**
-     * @var \Slim\Slim Reference to the primary application instance
+     * Reference to the primary application instance
+     * @var \Slim\App
      */
     protected $app;
 
     /**
-     * @var mixed Reference to the next downstream middleware
+     * Reference to the next downstream middleware
+     * @var \Slim\Middleware|\Slim\App
      */
     protected $next;
 
@@ -57,7 +71,7 @@ abstract class Middleware
      * This method injects the primary Slim application instance into
      * this middleware.
      *
-     * @param  \Slim\Slim $application
+     * @param  \Slim\App $application
      */
     final public function setApplication($application)
     {
@@ -70,7 +84,7 @@ abstract class Middleware
      * This method retrieves the application previously injected
      * into this middleware.
      *
-     * @return \Slim\Slim
+     * @return \Slim\App
      */
     final public function getApplication()
     {
@@ -84,7 +98,7 @@ abstract class Middleware
      * this middleware so that it may optionally be called
      * when appropriate.
      *
-     * @param \Slim|\Slim\Middleware
+     * @param \Slim\App|\Slim\Middleware
      */
     final public function setNextMiddleware($nextMiddleware)
     {
@@ -97,7 +111,7 @@ abstract class Middleware
      * This method retrieves the next downstream middleware
      * previously injected into this middleware.
      *
-     * @return \Slim\Slim|\Slim\Middleware
+     * @return \Slim\App|\Slim\Middleware
      */
     final public function getNextMiddleware()
     {
@@ -110,5 +124,5 @@ abstract class Middleware
      * Perform actions specific to this middleware and optionally
      * call the next downstream middleware.
      */
-    abstract public function call();
+    // abstract public function call();
 }

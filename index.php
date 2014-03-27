@@ -3,13 +3,12 @@
  * Step 1: Require the Slim Framework
  *
  * If you are not using Composer, you need to require the
- * Slim Framework and register its PSR-0 autoloader.
+ * Slim Framework and register its PSR-0 autoloader with:
  *
- * If you are using Composer, you can skip this step.
+ *     require 'Slim/Autoloader.php';
+ *     \Slim\Autoloader::register();
  */
-require 'Slim/Slim.php';
-
-\Slim\Slim::registerAutoloader();
+require 'vendor/autoload.php';
 
 /**
  * Step 2: Instantiate a Slim application
@@ -19,7 +18,7 @@ require 'Slim/Slim.php';
  * your Slim application now by passing an associative array
  * of setting names and values into the application constructor.
  */
-$app = new \Slim\Slim();
+$app = new \Slim\App();
 
 /**
  * Step 3: Define the Slim application routes

@@ -6,7 +6,7 @@
  * @copyright   2011 Josh Lockhart
  * @link        http://www.slimframework.com
  * @license     http://www.slimframework.com/license
- * @version     2.4.2
+ * @version     2.3.5
  * @package     Slim
  *
  * MIT LICENSE
@@ -32,44 +32,56 @@
  */
 namespace Slim;
 
+use \Slim\Interfaces\RouterInterface;
+use \Slim\Interfaces\RouteInterface;
+
 /**
  * Router
  *
- * This class organizes, iterates, and dispatches \Slim\Route objects.
+ * This class organizes Slim application route objects. It is responsible
+ * for registering route objects, assigning names to route objects,
+ * finding routes that match the current HTTP request, and creating
+ * URLs for a named route.
  *
  * @package Slim
  * @author  Josh Lockhart
  * @since   1.0.0
  */
-class Router
+class Router implements RouterInterface
 {
     /**
-     * @var Route The current route (most recently dispatched)
+     * The current (most recently dispatched) route
+     * @var \Slim\Route
      */
     protected $currentRoute;
 
     /**
-     * @var array Lookup hash of all route objects
+     * All route objects, numerically indexed
+     * @var array[\Slim\Interfaces\RouteInterface]
      */
     protected $routes;
 
     /**
-     * @var array Lookup hash of named route objects, keyed by route name (lazy-loaded)
+     * Named route objects, indexed by route name
+     * @var array[\Slim\Interfaces\RouteInterface]
      */
     protected $namedRoutes;
 
     /**
-     * @var array Array of route objects that match the request URI (lazy-loaded)
+     * Route objects that match the request URI
+     * @var array[\Slim\Interfaces\RouteInterface]
      */
     protected $matchedRoutes;
 
     /**
-     * @var array Array containing all route groups
+     * Route groups
+     * @var array
      */
     protected $routeGroups;
 
     /**
      * Constructor
+     * @api
      */
     public function __construct()
     {
@@ -78,8 +90,15 @@ class Router
     }
 
     /**
-     * Get Current Route object or the first matched one if matching has been performed
-     * @return \Slim\Route|null
+     * Get current route
+     *
+     * This method will return the current \Slim\Route object. If a route
+     * has not been dispatched, but route matching has been completed, the
+     * first matching \Slim\Route object will be returned. If route matching
+     * has not completed, null will be returned.
+     *
+     * @return \Slim\Interfaces\RouteInterface|null
+     * @api
      */
     public function getCurrentRoute()
     {
@@ -95,50 +114,63 @@ class Router
     }
 
     /**
-     * Return route objects that match the given HTTP method and URI
-     * @param  string               $httpMethod   The HTTP method to match against
-     * @param  string               $resourceUri  The resource URI to match against
-     * @param  bool                 $reload       Should matching routes be re-parsed?
-     * @return array[\Slim\Route]
+     * Get route objects that match a given HTTP method and URI
+     *
+     * This method is responsible for finding and returning all \Slim\Interfaces\RouteInterface
+     * objects that match a given HTTP method and URI. Slim uses this method to
+     * determine which \Slim\Interfaces\RouteInterface objects are candidates to be
+     * dispatched for the current HTTP request.
+     *
+     * @param  string             $httpMethod  The HTTP request method
+     * @param  string             $resourceUri The resource URI
+     * @param  bool               $reload      Should matching routes be re-parsed?
+     * @return array[\Slim\Interfaces\RouteInterface]
+     * @api
      */
-    public function getMatchedRoutes($httpMethod, $resourceUri, $reload = false)
+    public function getMatchedRoutes($httpMethod, $resourceUri, $save = true)
     {
-        if ($reload || is_null($this->matchedRoutes)) {
-            $this->matchedRoutes = array();
-            foreach ($this->routes as $route) {
-                if (!$route->supportsHttpMethod($httpMethod) && !$route->supportsHttpMethod("ANY")) {
-                    continue;
-                }
+        $matchedRoutes = array();
+        foreach ($this->routes as $route) {
+            if (!$route->supportsHttpMethod($httpMethod) && !$route->supportsHttpMethod("ANY")) {
+                continue;
+            }
 
-                if ($route->matches($resourceUri)) {
-                    $this->matchedRoutes[] = $route;
-                }
+            if ($route->matches($resourceUri)) {
+                $matchedRoutes[] = $route;
             }
         }
 
-        return $this->matchedRoutes;
+        if ($save === true) {
+            $this->matchedRoutes = $matchedRoutes;
+        }
+
+        return $matchedRoutes;
     }
 
     /**
-     * Add a route object to the router
-     * @param  \Slim\Route     $route      The Slim Route
+     * Add a route
+     *
+     * This method registers a \Slim\Interfaces\RouteInterface object with the router.
+     *
+     * @param  \Slim\Interfaces\RouteInterface $route The route object
+     * @api
      */
-    public function map(\Slim\Route $route)
+    public function map(RouteInterface $route)
     {
         list($groupPattern, $groupMiddleware) = $this->processGroups();
-
         $route->setPattern($groupPattern . $route->getPattern());
         $this->routes[] = $route;
-
-
         foreach ($groupMiddleware as $middleware) {
             $route->setMiddleware($middleware);
         }
     }
 
     /**
-     * A helper function for processing the group's pattern and middleware
-     * @return array Returns an array with the elements: pattern, middlewareArr
+     * Process route groups
+     *
+     * A helper method for processing the group's pattern and middleware.
+     *
+     * @return array An array with the elements: pattern, middlewareArr
      */
     protected function processGroups()
     {
@@ -158,7 +190,8 @@ class Router
      * Add a route group to the array
      * @param  string     $group      The group pattern (ie. "/books/:id")
      * @param  array|null $middleware Optional parameter array of middleware
-     * @return int        The index of the new group
+     * @return int                    The index of the new group
+     * @api
      */
     public function pushGroup($group, $middleware = array())
     {
@@ -167,7 +200,8 @@ class Router
 
     /**
      * Removes the last route group from the array
-     * @return bool    True if successful, else False
+     * @return bool True if successful, else False
+     * @api
      */
     public function popGroup()
     {
@@ -176,10 +210,11 @@ class Router
 
     /**
      * Get URL for named route
-     * @param  string               $name   The name of the route
-     * @param  array                $params Associative array of URL parameter names and replacement values
-     * @throws \RuntimeException            If named route not found
-     * @return string                       The URL for the given route populated with provided replacement values
+     * @param  string            $name   The name of the route
+     * @param  array             $params Associative array of URL parameter names and replacement values
+     * @return string                    The URL for the given route populated with provided replacement values
+     * @throws \RuntimeException         If named route not found
+     * @api
      */
     public function urlFor($name, $params = array())
     {
@@ -198,11 +233,12 @@ class Router
 
     /**
      * Add named route
-     * @param  string            $name   The route name
-     * @param  \Slim\Route       $route  The route object
-     * @throws \RuntimeException         If a named route already exists with the same name
+     * @param  string                                $name   The route name
+     * @param  \Slim\Interfaces\RouteInterface       $route  The route object
+     * @throws \RuntimeException                             If a named route already exists with the same name
+     * @api
      */
-    public function addNamedRoute($name, \Slim\Route $route)
+    public function addNamedRoute($name, RouteInterface $route)
     {
         if ($this->hasNamedRoute($name)) {
             throw new \RuntimeException('Named route already exists with name: ' . $name);
@@ -212,8 +248,9 @@ class Router
 
     /**
      * Has named route
-     * @param  string   $name   The route name
+     * @param  string $name The route name
      * @return bool
+     * @api
      */
     public function hasNamedRoute($name)
     {
@@ -224,22 +261,24 @@ class Router
 
     /**
      * Get named route
-     * @param  string           $name
-     * @return \Slim\Route|null
+     * @param  string                               $name
+     * @return \Slim\Interfaces\RouteInterface|null
+     * @api
      */
     public function getNamedRoute($name)
     {
         $this->getNamedRoutes();
         if ($this->hasNamedRoute($name)) {
             return $this->namedRoutes[(string) $name];
-        } else {
-            return null;
         }
+
+        return null;
     }
 
     /**
-     * Get named routes
+     * Get external iterator for named routes
      * @return \ArrayIterator
+     * @api
      */
     public function getNamedRoutes()
     {

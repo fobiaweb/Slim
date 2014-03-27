@@ -6,7 +6,7 @@
  * @copyright   2011 Josh Lockhart
  * @link        http://www.slimframework.com
  * @license     http://www.slimframework.com/license
- * @version     2.4.2
+ * @version     2.3.5
  * @package     Slim
  *
  * MIT LICENSE
@@ -32,27 +32,34 @@
  */
 namespace Slim\Http;
 
- /**
-  * HTTP Headers
-  *
-  * @package Slim
-  * @author  Josh Lockhart
-  * @since   1.6.0
-  */
-class Headers extends \Slim\Helper\Set
-{
-    /********************************************************************************
-    * Static interface
-    *******************************************************************************/
+use \Slim\Collection;
+use \Slim\Interfaces\EnvironmentInterface;
+use \Slim\Interfaces\Http\HeadersInterface;
 
+/**
+ * Headers
+ *
+ * This class manages a collection of HTTP headers. Each \Slim\Http\Request
+ * and \Slim\Http\Response instance will contain a \Slim\Http\Cookies instance.
+ *
+ * Because HTTP headers may be upper, lower, or mixed case, this class
+ * normalizes the user-requested header name into a canonical internal format
+ * so that it can adapt to and successfully handle any header name format.
+ *
+ * Otherwise, this class extends \Slim\Container and has access to a simple
+ * and common interface to manipulate HTTP header data.
+ *
+ * @package Slim
+ * @author  Josh Lockhart
+ * @since   1.6.0
+ */
+class Headers extends Collection implements HeadersInterface
+{
     /**
-     * Special-case HTTP headers that are otherwise unidentifiable as HTTP headers.
-     * Typically, HTTP headers in the $_SERVER array will be prefixed with
-     * `HTTP_` or `X_`. These are not so we list them here for later reference.
-     *
+     * Special header keys to treat like HTTP_ headers
      * @var array
      */
-    protected static $special = array(
+    protected $special = array(
         'CONTENT_TYPE',
         'CONTENT_LENGTH',
         'PHP_AUTH_USER',
@@ -62,36 +69,95 @@ class Headers extends \Slim\Helper\Set
     );
 
     /**
-     * Extract HTTP headers from an array of data (e.g. $_SERVER)
-     * @param  array $data
-     * @return array
+     * Constructor, will parse an environment for headers if present
+     *
+     * @param \Slim\Interfaces\EnvironmentInterface $environment
+     * @api
      */
-    public static function extract($data)
+    public function __construct(EnvironmentInterface $environment = null)
     {
-        $results = array();
-        foreach ($data as $key => $value) {
-            $key = strtoupper($key);
-            if (strpos($key, 'X_') === 0 || strpos($key, 'HTTP_') === 0 || in_array($key, static::$special)) {
-                if ($key === 'HTTP_CONTENT_LENGTH') {
-                    continue;
-                }
-                $results[$key] = $value;
-            }
+        if (!is_null($environment)) {
+            $this->parseHeaders($environment);
         }
-
-        return $results;
     }
 
-    /********************************************************************************
-    * Instance interface
-    *******************************************************************************/
+    /**
+     * Parse provided headers into this collection
+     *
+     * @param  \Slim\Interfaces\EnvironmentInterface $environment
+     * @return void
+     * @api
+     */
+    public function parseHeaders(EnvironmentInterface $environment)
+    {
+        foreach ($environment as $key => $value) {
+            $key = strtoupper($key);
+
+            if (strpos($key, 'HTTP_') === 0 || in_array($key, $this->special)) {
+                if ($key === 'HTTP_CONTENT_TYPE' || $key === 'HTTP_CONTENT_LENGTH') {
+                    continue;
+                }
+
+                parent::set($this->normalizeKey($key), $value);
+            }
+        }
+    }
+
+    /**
+     * Set data key to value
+     *
+     * @param string $key   The data key
+     * @param mixed  $value The data value
+     * @api
+     */
+    public function set($key, $value)
+    {
+        parent::set($this->normalizeKey($key), $value);
+    }
+
+    /**
+     * Get data value with key
+     *
+     * @param  string $key     The data key
+     * @param  mixed  $default The value to return if data key does not exist
+     * @return mixed           The data value, or the default value
+     * @api
+     */
+    public function get($key, $default = null)
+    {
+        return parent::get($this->normalizeKey($key), $default);
+    }
+
+    /**
+     * Does this set contain a key?
+     *
+     * @param  string  $key The data key
+     * @return boolean
+     * @api
+     */
+    public function has($key)
+    {
+        return parent::has($this->normalizeKey($key));
+    }
+
+    /**
+     * Remove value with key from this set
+     *
+     * @param string $key The data key
+     * @api
+     */
+    public function remove($key)
+    {
+        parent::remove($this->normalizeKey($key));
+    }
 
     /**
      * Transform header name into canonical form
+     *
      * @param  string $key
      * @return string
      */
-    protected function normalizeKey($key)
+    public function normalizeKey($key)
     {
         $key = strtolower($key);
         $key = str_replace(array('-', '_'), ' ', $key);
