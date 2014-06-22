@@ -298,12 +298,12 @@ class Response implements ResponseInterface
 
     public function addHeader($name, $value)
     {
-        // TODO
+        $this->headers->set($name, $value);
     }
 
     public function addHeaders(array $headers)
     {
-        // TODO
+        $this->headers->replace($headers);
     }
 
     /**
