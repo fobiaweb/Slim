@@ -160,7 +160,6 @@ class App extends \Pimple
             if ($c['settings']['view'] instanceof \Slim\Interfaces\ViewInterface) {
                 $c['view']->set('flash', $flash);
             }
-
             return $flash;
         };
 
@@ -1134,6 +1133,7 @@ class App extends \Pimple
         // Cache original request and response
         $oldRequest = $this['request'];
         $oldResponse = $this['response'];
+        unset($this['request'], $this['response']);
 
         // Set sub-request and sub-response
         $this['request'] = $subRequest;
@@ -1143,6 +1143,7 @@ class App extends \Pimple
         $this->dispatchRequest($subRequest, $subResponse);
 
         // Restore original request and response
+        unset($this['request'], $this['response']);
         $this['request'] = $oldRequest;
         $this['response'] = $oldResponse;
 
