@@ -305,7 +305,7 @@ class Response implements ResponseInterface
      */
     public function addHeader($name, $value)
     {
-        $this->headers->set($name, $value);
+        $this->headers->add($name, $value);
     }
 
     /**
@@ -316,7 +316,9 @@ class Response implements ResponseInterface
      */
     public function addHeaders(array $headers)
     {
-        $this->headers->replace($headers);
+        foreach ($headers as $name => $value) {
+            $this->headers->add($name, $value);
+        }
     }
 
     /**

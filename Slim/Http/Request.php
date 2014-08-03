@@ -291,7 +291,7 @@ class Request implements RequestInterface
      */
     public function addHeader($name, $value)
     {
-        $this->headers->set($name, $value);
+        $this->headers->add($name, $value);
     }
 
     /**
@@ -302,7 +302,9 @@ class Request implements RequestInterface
      */
     public function addHeaders(array $headers)
     {
-        $this->headers->replace($headers);
+        foreach ($headers as $name => $value) {
+            $this->headers->add($name, $value);
+        }
     }
 
     /**
