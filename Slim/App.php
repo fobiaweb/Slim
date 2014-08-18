@@ -160,6 +160,7 @@ class App extends \Pimple
             if ($c['settings']['view'] instanceof \Slim\Interfaces\ViewInterface) {
                 $c['view']->set('flash', $flash);
             }
+
             return $flash;
         };
 
